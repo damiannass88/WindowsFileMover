@@ -1,14 +1,23 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 
 namespace WindowsFileMover
 {
-    public sealed class FileItem
+    public sealed class FileItem : INotifyPropertyChanged
     {
-        public bool IsSelected { get; set; }
+        private bool _isSelected;
+
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set
+            {
+                if (_isSelected == value) return;
+                _isSelected = value;
+                OnPropertyChanged();
+            }
+        }
 
         public string Name { get; init; } = "";
         public string FullPath { get; init; } = "";
@@ -30,5 +39,10 @@ namespace WindowsFileMover
 
             return $"{size:0.##} {units[unit]}";
         }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        private void OnPropertyChanged([CallerMemberName] string? name = null)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
-    }
+}

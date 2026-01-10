@@ -1,4 +1,6 @@
-﻿using System.Collections.ObjectModel;
+﻿using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
@@ -10,11 +12,12 @@ namespace WindowsFileMover;
 public sealed class MainWindowViewModel : INotifyPropertyChanged
 {
     public ObservableCollection<FileItem> Files { get; } = new();
+    private readonly HashSet<FileItem> _monitoredFiles = new();
 
     private string? _sourceFolder;
     private string? _destinationFolder;
 
-    public string SourceFolderLabel => $"Source: {(_sourceFolder ?? "(not set)")}";
+    public string SourceFolderLabel => $"Source: {(_sourceFolder ?? "(not set)")};";
     public string DestinationFolderLabel => $"Destination: {(_destinationFolder ?? "(not set)")}";
     private string _status = "Ready.";
     public string Status { get => _status; set { _status = value; OnPropertyChanged(); } }
@@ -58,6 +61,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     public MainWindowViewModel()
     {
+        Files.CollectionChanged += Files_CollectionChanged;
+
         PickSourceCommand = new RelayCommand(PickSource);
         PickDestinationCommand = new RelayCommand(PickDestination);
 
@@ -86,6 +91,44 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     }
 
     private void RefreshMoveCanExecute() => MoveCommand.RaiseCanExecuteChanged();
+
+    private void Files_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.Action == NotifyCollectionChangedAction.Reset)
+        {
+            foreach (var item in _monitoredFiles)
+                item.PropertyChanged -= FileItem_PropertyChanged;
+            _monitoredFiles.Clear();
+            RefreshMoveCanExecute();
+            return;
+        }
+
+        if (e.OldItems != null)
+        {
+            foreach (var oldItem in e.OldItems)
+            {
+                if (oldItem is FileItem removed && _monitoredFiles.Remove(removed))
+                    removed.PropertyChanged -= FileItem_PropertyChanged;
+            }
+        }
+
+        if (e.NewItems != null)
+        {
+            foreach (var newItem in e.NewItems)
+            {
+                if (newItem is FileItem added && _monitoredFiles.Add(added))
+                    added.PropertyChanged += FileItem_PropertyChanged;
+            }
+        }
+
+        RefreshMoveCanExecute();
+    }
+
+    private void FileItem_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(FileItem.IsSelected))
+            RefreshMoveCanExecute();
+    }
 
     private void PickSource()
     {
