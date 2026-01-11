@@ -1,7 +1,9 @@
-﻿using System.Collections.ObjectModel;
+﻿using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using Application = System.Windows.Application;
@@ -56,6 +58,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public RelayCommand SelectAllCommand { get; }
     public RelayCommand SelectNoneCommand { get; }
     public RelayCommand<FileItem> OpenFileCommand { get; }
+    public RelayCommand ResetCommand { get; }
 
     private bool _isBusy;
 
@@ -67,6 +70,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         SearchCommand = new RelayCommand(async () => await SearchAsync(), () => !_isBusy);
         MoveCommand = new RelayCommand(async () => await MoveSelectedAsync());
         OpenFileCommand = new RelayCommand<FileItem>(OpenFile, file => !_isBusy && file != null);
+        ResetCommand = new RelayCommand(Reset, () => !_isBusy);
 
         SelectAllCommand = new RelayCommand(() =>
         {
@@ -87,6 +91,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         Status = status;
         SearchCommand.RaiseCanExecuteChanged();
         OpenFileCommand.RaiseCanExecuteChanged();
+        ResetCommand.RaiseCanExecuteChanged();
     }
 
     private void PickSource()
@@ -201,6 +206,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                     found.Add(new FileItem
                     {
                         IsSelected = false,
+                        MoveWithFolder = false,
                         Name = fi.Name,
                         FullPath = fi.FullName,
                         SizeBytes = fi.Length
@@ -271,7 +277,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                     var src = item.FullPath;
 
                     var destFolder = destRoot;
-                    if (KeepStructure)
+                    if (item.MoveWithFolder)
+                    {
+                        var parent = Path.GetDirectoryName(src);
+                        if (!string.IsNullOrEmpty(parent))
+                            destFolder = Path.Combine(destRoot, Path.GetFileName(parent));
+                    }
+                    else if (KeepStructure)
                     {
                         var rel = Path.GetRelativePath(sourceRoot, Path.GetDirectoryName(src)!);
                         destFolder = Path.Combine(destRoot, rel);
@@ -282,6 +294,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
                     if (File.Exists(destPath))
                     {
+                        if (item.MoveWithFolder)
+                        {
+                            // skip on conflict when moving with folder
+                            errors.Add($"Skipped (exists): {destPath}");
+                            continue;
+                        }
+
                         if (AutoRenameOnConflict)
                             destPath = GetNonConflictingPath(destPath);
                         else
@@ -357,6 +376,48 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
 
         throw new IOException("Could not generate a unique destination filename.");
+    }
+
+    private void Reset()
+    {
+        if (_isBusy)
+            return;
+
+        Files.Clear();
+        _sourceFolder = null;
+        _destinationFolder = null;
+        OnPropertyChanged(nameof(SourceFolderLabel));
+        OnPropertyChanged(nameof(DestinationFolderLabel));
+
+        WithWord = string.Empty;
+
+        ExtMp4 = true;
+        ExtMkv = true;
+        ExtAvi = true;
+        ExtMov = false;
+        ExtWmv = false;
+        ExtFlv = false;
+        ExtWebm = false;
+        OnPropertyChanged(nameof(ExtMp4));
+        OnPropertyChanged(nameof(ExtMkv));
+        OnPropertyChanged(nameof(ExtAvi));
+        OnPropertyChanged(nameof(ExtMov));
+        OnPropertyChanged(nameof(ExtWmv));
+        OnPropertyChanged(nameof(ExtFlv));
+        OnPropertyChanged(nameof(ExtWebm));
+
+        CustomExtensions = string.Empty;
+
+        KeepStructure = false;
+        AutoRenameOnConflict = true;
+        OnPropertyChanged(nameof(KeepStructure));
+        OnPropertyChanged(nameof(AutoRenameOnConflict));
+
+        ProgressValue = 0;
+        ProgressMax = 0;
+        ProgressText = string.Empty;
+
+        SetBusy(false, "Ready.");
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="Windows File Mover" Height="720" Width="1200">
+        Title="Windows File Mover" Height="1020" Width="1400">
     <DockPanel>
 
         
@@ -56,12 +56,18 @@
                     Padding="10,6"
                     Margin="0,0,16,0"/>
 
+                    <Button Content="Reset"
+                            Command="{Binding ResetCommand}"
+                            Padding="10,6"
+                            Margin="11,0,20,0"/>
+
                     <CheckBox Content="Keep folder structure (from source)"
                       IsChecked="{Binding KeepStructure}"
                       Margin="0,0,12,0"/>
 
                     <CheckBox Content="Auto-rename on conflict moving"
                       IsChecked="{Binding AutoRenameOnConflict}"/>
+
                 </WrapPanel>
 
                 <!-- ROW 2: FILTERS -->
@@ -182,6 +188,18 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
+                <DataGridCheckBoxColumn Header="Move with Folder"
+                                        Width="130"
+                                        Binding="{Binding MoveWithFolder, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                        ElementStyle="{StaticResource LargeFileCheckBox}"
+                                        EditingElementStyle="{StaticResource LargeFileCheckBox}">
+                    <DataGridCheckBoxColumn.HeaderStyle>
+                        <Style TargetType="DataGridColumnHeader">
+                            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                            <Setter Property="VerticalContentAlignment" Value="Center"/>
+                        </Style>
+                    </DataGridCheckBoxColumn.HeaderStyle>
+                </DataGridCheckBoxColumn>
                  <DataGridTextColumn Header="Full path" Binding="{Binding FullPath}" Width="4*"/>
             </DataGrid.Columns>
         </DataGrid>

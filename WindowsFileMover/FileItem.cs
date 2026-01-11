@@ -6,6 +6,7 @@ namespace WindowsFileMover
     public sealed class FileItem : INotifyPropertyChanged
     {
         private bool _isSelected;
+        private bool _moveWithFolder;
 
         public bool IsSelected
         {
@@ -14,6 +15,17 @@ namespace WindowsFileMover
             {
                 if (_isSelected == value) return;
                 _isSelected = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool MoveWithFolder
+        {
+            get => _moveWithFolder;
+            set
+            {
+                if (_moveWithFolder == value) return;
+                _moveWithFolder = value;
                 OnPropertyChanged();
             }
         }
