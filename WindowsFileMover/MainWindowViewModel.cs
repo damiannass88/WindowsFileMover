@@ -1,7 +1,6 @@
-﻿using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Collections.Specialized;
+﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows;
@@ -12,13 +11,13 @@ namespace WindowsFileMover;
 public sealed class MainWindowViewModel : INotifyPropertyChanged
 {
     public ObservableCollection<FileItem> Files { get; } = new();
-    private readonly HashSet<FileItem> _monitoredFiles = new();
 
     private string? _sourceFolder;
     private string? _destinationFolder;
 
     public string SourceFolderLabel => $"Source: {(_sourceFolder ?? "(not set)")};";
     public string DestinationFolderLabel => $"Destination: {(_destinationFolder ?? "(not set)")}";
+
     private string _status = "Ready.";
     public string Status { get => _status; set { _status = value; OnPropertyChanged(); } }
 
@@ -56,29 +55,29 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public RelayCommand MoveCommand { get; }
     public RelayCommand SelectAllCommand { get; }
     public RelayCommand SelectNoneCommand { get; }
+    public RelayCommand<FileItem> OpenFileCommand { get; }
 
     private bool _isBusy;
 
     public MainWindowViewModel()
     {
-        Files.CollectionChanged += Files_CollectionChanged;
-
         PickSourceCommand = new RelayCommand(PickSource);
         PickDestinationCommand = new RelayCommand(PickDestination);
 
         SearchCommand = new RelayCommand(async () => await SearchAsync(), () => !_isBusy);
-        MoveCommand = new RelayCommand(async () => await MoveSelectedAsync(), () => !_isBusy && Files.Any(f => f.IsSelected));
+        MoveCommand = new RelayCommand(async () => await MoveSelectedAsync());
+        OpenFileCommand = new RelayCommand<FileItem>(OpenFile, file => !_isBusy && file != null);
 
         SelectAllCommand = new RelayCommand(() =>
         {
-            foreach (var f in Files) f.IsSelected = true;
-            RefreshMoveCanExecute();
+            foreach (var f in Files)
+                f.IsSelected = true;
         });
 
         SelectNoneCommand = new RelayCommand(() =>
         {
-            foreach (var f in Files) f.IsSelected = false;
-            RefreshMoveCanExecute();
+            foreach (var f in Files)
+                f.IsSelected = false;
         });
     }
 
@@ -87,47 +86,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         _isBusy = busy;
         Status = status;
         SearchCommand.RaiseCanExecuteChanged();
-        RefreshMoveCanExecute();
-    }
-
-    private void RefreshMoveCanExecute() => MoveCommand.RaiseCanExecuteChanged();
-
-    private void Files_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
-    {
-        if (e.Action == NotifyCollectionChangedAction.Reset)
-        {
-            foreach (var item in _monitoredFiles)
-                item.PropertyChanged -= FileItem_PropertyChanged;
-            _monitoredFiles.Clear();
-            RefreshMoveCanExecute();
-            return;
-        }
-
-        if (e.OldItems != null)
-        {
-            foreach (var oldItem in e.OldItems)
-            {
-                if (oldItem is FileItem removed && _monitoredFiles.Remove(removed))
-                    removed.PropertyChanged -= FileItem_PropertyChanged;
-            }
-        }
-
-        if (e.NewItems != null)
-        {
-            foreach (var newItem in e.NewItems)
-            {
-                if (newItem is FileItem added && _monitoredFiles.Add(added))
-                    added.PropertyChanged += FileItem_PropertyChanged;
-            }
-        }
-
-        RefreshMoveCanExecute();
-    }
-
-    private void FileItem_PropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(FileItem.IsSelected))
-            RefreshMoveCanExecute();
+        OpenFileCommand.RaiseCanExecuteChanged();
     }
 
     private void PickSource()
@@ -184,13 +143,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         if (ExtFlv) Add("flv");
         if (ExtWebm) Add("webm");
 
-        // Custom: comma/space separated
         if (!string.IsNullOrWhiteSpace(CustomExtensions))
         {
             var parts = CustomExtensions
                 .Split([',', ';', ' ', '\t', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-            foreach (var p in parts) Add(p);
+            foreach (var p in parts)
+                Add(p);
         }
 
         return set;
@@ -214,7 +173,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         var extSet = BuildExtensionsSet();
         var withWord = (WithWord ?? "").Trim();
 
-        // Enumerate in background
         var results = await Task.Run(() =>
         {
             var found = new List<FileItem>();
@@ -222,7 +180,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             {
                 RecurseSubdirectories = true,
                 IgnoreInaccessible = true,
-                AttributesToSkip = FileAttributes.ReparsePoint // omijamy linki/symlinki, żeby nie zapętlić
+                AttributesToSkip = FileAttributes.ReparsePoint
             };
 
             foreach (var path in Directory.EnumerateFiles(_sourceFolder!, "*", opts))
@@ -250,18 +208,16 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 }
                 catch
                 {
-                    // pomijamy pliki, których nie da się odczytać
+                    // ignore unreadable files
                 }
             }
 
-            // sort: większe na górze
             return found.OrderByDescending(f => f.SizeBytes).ToList();
         });
 
         ProgressMax = results.Count;
         ProgressValue = 0;
 
-        // UI thread: dodawanie z progressem
         foreach (var item in results)
         {
             Files.Add(item);
@@ -277,6 +233,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     private async Task MoveSelectedAsync()
     {
+        if (_isBusy)
+            return;
+
         if (string.IsNullOrWhiteSpace(_destinationFolder) || !Directory.Exists(_destinationFolder))
         {
             System.Windows.MessageBox.Show("Set a valid Destination folder first.", "Missing Destination",
@@ -311,8 +270,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 {
                     var src = item.FullPath;
 
-                    // docelowa ścieżka:
-                    string destFolder = destRoot;
+                    var destFolder = destRoot;
                     if (KeepStructure)
                     {
                         var rel = Path.GetRelativePath(sourceRoot, Path.GetDirectoryName(src)!);
@@ -339,7 +297,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 }
                 finally
                 {
-                    // aktualizacja progresu na UI
                     Application.Current.Dispatcher.Invoke(() =>
                     {
                         ProgressValue++;
@@ -350,21 +307,39 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             }
         });
 
-        // Usuń z listy to, co faktycznie przeniesione
         var toRemove = Files.Where(f => movedPaths.Contains(f.FullPath)).ToList();
-        foreach (var r in toRemove) Files.Remove(r);
+        foreach (var r in toRemove)
+            Files.Remove(r);
 
         ProgressText = $"Moved: {ProgressValue}/{ProgressMax}";
         SetBusy(false, errors.Count == 0 ? "Move completed." : $"Move completed with {errors.Count} error(s).");
 
-        RefreshMoveCanExecute();
-
         if (errors.Count > 0)
         {
-            // pokaż do 20 błędów, resztę skróć
             var preview = string.Join(Environment.NewLine, errors.Take(20));
-            if (errors.Count > 20) preview += $"{Environment.NewLine}... (+{errors.Count - 20} more)";
+            if (errors.Count > 20)
+                preview += $"{Environment.NewLine}... (+{errors.Count - 20} more)";
             System.Windows.MessageBox.Show(preview, "Move errors", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void OpenFile(FileItem? file)
+    {
+        if (file == null)
+            return;
+
+        try
+        {
+            var startInfo = new ProcessStartInfo(file.FullPath)
+            {
+                UseShellExecute = true
+            };
+            Process.Start(startInfo);
+        }
+        catch (Exception ex)
+        {
+            System.Windows.MessageBox.Show($"Failed to open file: {ex.Message}", "Open file",
+                MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -388,9 +363,5 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private void OnPropertyChanged([CallerMemberName] string? name = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-
-        // Move availability może zależeć od tego, czy zaznaczyłeś coś
-        if (name is nameof(Status) or nameof(ProgressValue) or nameof(ProgressMax)) return;
-        RefreshMoveCanExecute();
     }
 }

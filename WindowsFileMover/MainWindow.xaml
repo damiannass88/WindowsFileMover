@@ -157,7 +157,7 @@
             <DataGrid.Columns>
                 <DataGridCheckBoxColumn Header="✔"
                                     Width="70"
-                                    Binding="{Binding IsSelected, Mode=TwoWay}"
+                                    Binding="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                     ElementStyle="{StaticResource LargeFileCheckBox}"
                                     EditingElementStyle="{StaticResource LargeFileCheckBox}">
                 <DataGridCheckBoxColumn.HeaderStyle>
@@ -170,7 +170,19 @@
 
                 <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*"/>
                 <DataGridTextColumn Header="Size" Binding="{Binding SizeHuman}" Width="120"/>
-                <DataGridTextColumn Header="Full path" Binding="{Binding FullPath}" Width="4*"/>
+                <DataGridTemplateColumn Header="Open file" Width="110">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button Content="Open"
+                                    Padding="6,2"
+                                    Margin="0,0,0,0"
+                                    HorizontalAlignment="Center"
+                                    Command="{Binding DataContext.OpenFileCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    CommandParameter="{Binding}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                 <DataGridTextColumn Header="Full path" Binding="{Binding FullPath}" Width="4*"/>
             </DataGrid.Columns>
         </DataGrid>
     </DockPanel>
