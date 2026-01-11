@@ -4,11 +4,13 @@ A lightweight WPF utility for Windows that scans a selected folder, lists matchi
 
 The UI exposes quick filters (preset extensions, keyword, and custom extension list), large selection checkboxes, and progress/status indicators so you always know what is happening.
 
-> ?? This tool performs file moves immediately and without safeguards. Use it only when you understand the impact and accept full responsibility for the moved files.
+> This tool performs file moves immediately and without safeguards. Use it only when you understand the impact and accept full responsibility for the moved files.
+
+<img width="1198" height="728" alt="image" src="https://github.com/user-attachments/assets/877b36c1-ad7d-479f-a804-79399fa71554" />
 
 ## Key Features
 
-- `Pick Source folder…` / `Pick Destination…` selectors with status labels.
+- `Pick Source folderâ€¦` / `Pick Destinationâ€¦` selectors with status labels.
 - Search filtration by keyword plus built-in toggles for common media extensions (mp4, mkv, avi, mov, wmv, flv, webm) and a custom text box for additional extensions.
 - Large checkbox column for the file list, with dedicated `Select all` / `Select none` actions and `Move selected` that activates only when files are selected.
 - Progress bar and status text that update while scanning and moving files.
@@ -28,7 +30,7 @@ The UI exposes quick filters (preset extensions, keyword, and custom extension l
 
 - Use the keyword and custom extensions to narrow results in large media folders.
 - If you need to re-select, click `Select all` and `Select none` to reset the checkboxes before toggling specific files.
-- Watch for the `Move selected` button’s enabled state; it is driven by the view model and updates as soon as the `IsSelected` flag changes.
+- Watch for the `Move selected` buttonâ€™s enabled state; it is driven by the view model and updates as soon as the `IsSelected` flag changes.
 
 ## Requirements
 
